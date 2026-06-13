@@ -30,6 +30,7 @@ def download_video_ytdlp(url, save_path='output', resolution='1080'):
         'outtmpl': f'{save_path}/%(title)s.%(ext)s',
         'noplaylist': True,
         'writethumbnail': True,
+        'merge_output_format': 'mp4',
         'postprocessors': [{'key': 'FFmpegThumbnailsConvertor', 'format': 'jpg'}],
     }
 
