@@ -118,7 +118,7 @@ python setup_env.py
 .venv/bin/streamlit run st.py            # macOS / Linux
 ```
 
-Or double-click `OneKeyStart_uv.bat` on Windows.
+Or double-click `OneKeyStart.bat` on Windows.
 
 ### Option B: Using Conda
 

@@ -162,7 +162,7 @@ VideoLingo supports Windows, macOS and Linux systems, and can run on CPU or GPU.
    .venv\Scripts\streamlit run st.py        # Windows
    .venv/bin/streamlit run st.py            # macOS / Linux
    ```
-   Or double-click `OneKeyStart_uv.bat` on Windows.
+   Or double-click `OneKeyStart.bat` on Windows.
 
 4. Set key in sidebar of popup webpage and start using~
 

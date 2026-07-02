@@ -1,221 +1,181 @@
-"""
-VideoLingo Environment Setup (No Anaconda Required)
+"""Create a VideoLingo Python environment, then run the stage-based installer.
 
-This script provides a conda-free installation path using `uv` (by Astral).
-It automatically:
-  1. Installs uv if not found
-  2. Creates a .venv with Python 3.10
-  3. Runs install.py inside the venv
-
-Usage:
-  python setup_env.py          # Full setup (any system Python 3.x works)
-  python setup_env.py --skip-install  # Only create venv, don't run install.py
+Default behavior creates a project-local ``.venv``. Use ``--shared`` to create
+or reuse ``~/.venvs/videolingo`` so multiple VideoLingo checkouts share the same
+heavy dependencies (PyTorch, WhisperX, Demucs, etc.).
 """
 
+from __future__ import annotations
+
+import argparse
 import os
-import sys
+import platform
 import shutil
 import subprocess
-import platform
+import sys
+from pathlib import Path
+
 
 PYTHON_VERSION = "3.10"
-VENV_DIR = ".venv"
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SCRIPT_DIR = Path(__file__).resolve().parent
+LOCAL_VENV = SCRIPT_DIR / ".venv"
+SHARED_VENV = Path.home() / ".venvs" / "videolingo"
 
 
-def run(cmd, check=True, **kwargs):
-    """Run a command and return the CompletedProcess."""
-    print(f"  > {' '.join(cmd) if isinstance(cmd, list) else cmd}")
+def run(cmd: list[str], check: bool = True, **kwargs) -> subprocess.CompletedProcess:
+    print("  > " + " ".join(str(x) for x in cmd))
     return subprocess.run(cmd, check=check, **kwargs)
 
 
-def is_uv_installed():
-    """Check if uv is available on PATH."""
+def is_uv_installed() -> bool:
     return shutil.which("uv") is not None
 
 
-def install_uv():
-    """Install uv using platform-appropriate method with fallbacks."""
-    print("\n[1/3] Installing uv...")
-
+def install_uv() -> None:
+    print("\n[1/3] Checking uv")
     if is_uv_installed():
-        ver = subprocess.run(
-            ["uv", "--version"], capture_output=True, text=True
-        ).stdout.strip()
+        ver = subprocess.run(["uv", "--version"], capture_output=True, text=True).stdout.strip()
         print(f"  uv is already installed: {ver}")
         return
 
-    system = platform.system()
-    if system == "Windows":
-        _install_uv_windows()
+    if platform.system() == "Windows":
+        methods = [
+            ["winget", "install", "astral-sh.uv", "--accept-package-agreements", "--accept-source-agreements"],
+            ["powershell", "-ExecutionPolicy", "ByPass", "-c", "irm https://astral.sh/uv/install.ps1 | iex"],
+            [sys.executable, "-m", "pip", "install", "uv"],
+        ]
     else:
-        # macOS / Linux
+        methods = [
+            ["sh", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh"],
+            [sys.executable, "-m", "pip", "install", "uv"],
+        ]
+
+    for cmd in methods:
         try:
-            run(["sh", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh"])
-        except subprocess.CalledProcessError:
-            print("  curl installer failed, trying pip...")
-            run([sys.executable, "-m", "pip", "install", "uv"])
-
-    # After installation, uv may not be on PATH in the current session.
-    if not is_uv_installed():
-        _add_uv_to_path()
-
-    if not is_uv_installed():
-        print(
-            "\n*** ERROR: uv was installed but not found on PATH. ***\n"
-            "Please restart your terminal and run this script again.\n"
-            "Or install uv manually: https://docs.astral.sh/uv/getting-started/installation/"
-        )
-        sys.exit(1)
-
-    ver = subprocess.run(
-        ["uv", "--version"], capture_output=True, text=True
-    ).stdout.strip()
-    print(f"  uv installed successfully: {ver}")
-
-
-def _install_uv_windows():
-    """Try multiple methods to install uv on Windows."""
-    methods = [
-        ("winget", ["winget", "install", "astral-sh.uv",
-                     "--accept-package-agreements", "--accept-source-agreements"]),
-        ("PowerShell installer", [
-            "powershell", "-ExecutionPolicy", "ByPass", "-c",
-            "irm https://astral.sh/uv/install.ps1 | iex"
-        ]),
-        ("pip", [sys.executable, "-m", "pip", "install", "uv"]),
-    ]
-
-    for name, cmd in methods:
-        try:
-            print(f"  Trying {name}...")
             run(cmd)
-            # Check if PATH needs updating after install
-            if not is_uv_installed():
-                _add_uv_to_path()
+            add_uv_to_path()
             if is_uv_installed():
+                print("  uv installed successfully")
                 return
         except (subprocess.CalledProcessError, FileNotFoundError):
-            print(f"  {name} failed, trying next method...")
-            continue
+            print("  install method failed, trying next method...")
 
-    print("  All installation methods failed.")
+    raise SystemExit("ERROR: uv could not be installed. Install it manually: https://docs.astral.sh/uv/")
 
 
-def _add_uv_to_path():
-    """Try to add uv's default install location to PATH for this session."""
-    home = os.path.expanduser("~")
+def add_uv_to_path() -> None:
     candidates = [
-        os.path.join(home, ".local", "bin"),
-        os.path.join(home, ".cargo", "bin"),
-        os.path.join(os.environ.get("LOCALAPPDATA", ""), "uv", "bin"),
-        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "uv"),
+        Path.home() / ".local" / "bin",
+        Path.home() / ".cargo" / "bin",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "uv" / "bin",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "uv",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "WinGet" / "Links",
     ]
-    for p in candidates:
-        if not os.path.isdir(p):
-            continue
-        uv_name = "uv.exe" if platform.system() == "Windows" else "uv"
-        if os.path.isfile(os.path.join(p, uv_name)):
-            os.environ["PATH"] = p + os.pathsep + os.environ["PATH"]
+    name = "uv.exe" if platform.system() == "Windows" else "uv"
+    for path in candidates:
+        if (path / name).is_file():
+            os.environ["PATH"] = str(path) + os.pathsep + os.environ.get("PATH", "")
             return
 
 
-def create_venv():
-    """Create a virtual environment with Python 3.10 using uv."""
-    print(f"\n[2/3] Creating virtual environment with Python {PYTHON_VERSION}...")
+def venv_python(venv_path: Path) -> Path:
+    if platform.system() == "Windows":
+        return venv_path / "Scripts" / "python.exe"
+    return venv_path / "bin" / "python"
 
-    venv_path = os.path.join(SCRIPT_DIR, VENV_DIR)
 
-    if os.path.exists(venv_path):
-        # Check if existing venv has the right Python version
-        python_exe = _get_venv_python(venv_path)
-        if python_exe and os.path.isfile(python_exe):
-            result = subprocess.run(
-                [python_exe, "--version"], capture_output=True, text=True
-            )
-            ver = result.stdout.strip()
-            if "3.10" in ver:
-                print(f"  .venv already exists with {ver}, reusing it.")
-                return python_exe
+def venv_bin(venv_path: Path) -> Path:
+    if platform.system() == "Windows":
+        return venv_path / "Scripts"
+    return venv_path / "bin"
 
-        print("  Removing existing .venv (wrong Python version)...")
-        shutil.rmtree(venv_path, ignore_errors=True)
 
-    # uv venv will auto-download Python 3.10 if not present
-    # --seed installs pip/setuptools into the venv (install.py needs pip)
-    run(["uv", "venv", "--seed", "--python", PYTHON_VERSION, VENV_DIR], cwd=SCRIPT_DIR)
+def python_version_ok(python_exe: Path) -> bool:
+    if not python_exe.is_file():
+        return False
+    result = subprocess.run([str(python_exe), "--version"], capture_output=True, text=True)
+    return "3.10" in (result.stdout or result.stderr)
 
-    python_exe = _get_venv_python(venv_path)
-    if not python_exe or not os.path.isfile(python_exe):
-        print("*** ERROR: Failed to create virtual environment. ***")
-        sys.exit(1)
 
-    result = subprocess.run(
-        [python_exe, "--version"], capture_output=True, text=True
-    )
-    print(f"  Virtual environment created: {result.stdout.strip()}")
+def create_venv(path: Path, yes: bool = False) -> Path:
+    print(f"\n[2/3] Creating/reusing virtual environment: {path}")
+    python_exe = venv_python(path)
+    if python_version_ok(python_exe):
+        result = subprocess.run([str(python_exe), "--version"], capture_output=True, text=True)
+        print(f"  Reusing existing venv: {result.stdout.strip() or result.stderr.strip()}")
+        return python_exe
+
+    if path.exists():
+        if not yes:
+            answer = input(f"  Existing venv at {path} is not Python 3.10. Remove and recreate it? [y/N] ").strip().lower()
+            if answer != "y":
+                raise SystemExit("Cancelled.")
+        shutil.rmtree(path, ignore_errors=True)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    run(["uv", "venv", "--seed", "--python", PYTHON_VERSION, str(path)], cwd=SCRIPT_DIR)
+    if not python_version_ok(python_exe):
+        raise SystemExit("ERROR: failed to create a Python 3.10 virtual environment")
     return python_exe
 
 
-def _get_venv_python(venv_path):
-    """Get the Python executable path inside the venv."""
-    if platform.system() == "Windows":
-        return os.path.join(venv_path, "Scripts", "python.exe")
-    else:
-        return os.path.join(venv_path, "bin", "python")
-
-
-def run_install(python_exe):
-    """Run install.py using the venv's Python."""
-    print("\n[3/3] Running install.py...")
-    install_script = os.path.join(SCRIPT_DIR, "install.py")
-
-    # Prepare env for install.py subprocess:
+def run_installer(python_exe: Path, args: argparse.Namespace) -> None:
+    print("\n[3/3] Installing VideoLingo dependencies")
     env = os.environ.copy()
-    # 1. Avoid pip cache permission errors (common on Windows when cache dir
-    #    is locked or has restrictive ACLs from a previous Python install)
-    env["PIP_NO_CACHE_DIR"] = "1"
-    # 2. Put venv Scripts/bin on PATH so install.py can find streamlit etc.
-    venv_path = os.path.join(SCRIPT_DIR, VENV_DIR)
-    if platform.system() == "Windows":
-        venv_bin = os.path.join(venv_path, "Scripts")
-    else:
-        venv_bin = os.path.join(venv_path, "bin")
-    env["PATH"] = venv_bin + os.pathsep + env.get("PATH", "")
+    env["PATH"] = str(venv_bin(python_exe.parent.parent)) + os.pathsep + env.get("PATH", "")
+    cmd = [str(python_exe), str(SCRIPT_DIR / "installer.py"), "--yes"]
+    if args.auto_mirror:
+        cmd.append("--auto-mirror")
+    if args.force:
+        cmd.append("--force")
+    if args.skip_demucs:
+        cmd.append("--skip-demucs")
+    if args.require_demucs:
+        cmd.append("--require-demucs")
+    run(cmd, cwd=SCRIPT_DIR, env=env)
 
-    run([python_exe, install_script], cwd=SCRIPT_DIR, env=env)
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Create and install a VideoLingo environment")
+    parser.add_argument("--shared", action="store_true", help=f"use shared venv at {SHARED_VENV}")
+    parser.add_argument("--path", help="custom venv path; implies --shared-style external venv")
+    parser.add_argument("--skip-install", action="store_true", help="only create/reuse the venv")
+    parser.add_argument("--auto-mirror", action="store_true", help="auto-select a PyPI mirror before install")
+    parser.add_argument("--skip-demucs", action="store_true", help="skip optional Demucs install")
+    parser.add_argument("--require-demucs", action="store_true", help="fail if Demucs cannot be installed")
+    parser.add_argument("--force", action="store_true", help="force reinstall staged packages")
+    parser.add_argument("--yes", action="store_true", help="non-interactive; recreate wrong-version venvs")
+    return parser
 
 
-def main():
+def main() -> None:
+    args = build_parser().parse_args()
+    target = Path(args.path).expanduser() if args.path else (SHARED_VENV if args.shared else LOCAL_VENV)
+
     print("=" * 60)
-    print("  VideoLingo Environment Setup (conda-free)")
+    print("  VideoLingo Environment Setup")
     print("=" * 60)
-    print(f"\n  Project dir : {SCRIPT_DIR}")
+    print(f"  Project dir : {SCRIPT_DIR}")
     print(f"  Python ver  : {PYTHON_VERSION}")
-    print(f"  Venv dir    : {VENV_DIR}")
-
-    skip_install = "--skip-install" in sys.argv
+    print(f"  Venv path   : {target}")
 
     install_uv()
-    python_exe = create_venv()
+    python_exe = create_venv(target, yes=args.yes)
 
-    if skip_install:
-        print(f"\n  --skip-install: Skipping install.py")
-        print(f"\n  To install dependencies manually:")
-        print(f"    {python_exe} install.py")
+    if args.skip_install:
+        print("\n  --skip-install: dependencies were not installed")
+        print(f"  To install later: {python_exe} {SCRIPT_DIR / 'installer.py'} --yes")
     else:
-        run_install(python_exe)
+        run_installer(python_exe, args)
 
     print("\n" + "=" * 60)
-    print("  Setup complete!")
+    print("  Setup complete")
     print("=" * 60)
-    print(f"\n  To start VideoLingo:")
     if platform.system() == "Windows":
-        print(f"    .venv\\Scripts\\streamlit run st.py")
-        print(f"    (or double-click OneKeyStart_uv.bat)")
+        print("  Start with: OneKeyStart.bat")
     else:
-        print(f"    .venv/bin/streamlit run st.py")
-    print()
+        streamlit = venv_bin(target) / "streamlit"
+        print(f"  Start with: {streamlit} run st.py")
 
 
 if __name__ == "__main__":

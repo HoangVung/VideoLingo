@@ -4,6 +4,7 @@ import time
 import subprocess
 import torch
 import functools
+from pathlib import Path
 
 warnings.filterwarnings("ignore")
 
@@ -33,6 +34,22 @@ from whisperx.audio import load_audio as _whisperx_load_audio, SAMPLE_RATE as _W
 from rich import print as rprint
 from core.utils import *
 MODEL_DIR = load_key("model_dir")
+
+
+def _hf_cache_dir_for_repo(cache_root, repo_id):
+    return Path(cache_root) / f"models--{repo_id.replace('/', '--')}"
+
+
+def _has_complete_hf_snapshot(cache_root, repo_id):
+    repo_dir = _hf_cache_dir_for_repo(cache_root, repo_id)
+    snapshots = repo_dir / "snapshots"
+    if not snapshots.exists():
+        return False
+    required_files = {"config.json", "model.bin", "tokenizer.json"}
+    for snapshot in snapshots.iterdir():
+        if snapshot.is_dir() and all((snapshot / name).exists() for name in required_files):
+            return True
+    return False
 
 @except_handler("failed to check hf mirror", default_return=None)
 def check_hf_mirror():
@@ -76,6 +93,7 @@ def transcribe_audio(raw_audio_file, vocal_audio_file, start, end):
         rprint(f"[cyan]📦 Batch size:[/cyan] {batch_size}, [cyan]⚙️ Compute type:[/cyan] {compute_type}")
     rprint(f"[green]▶️ Starting WhisperX for segment {start:.2f}s to {end:.2f}s...[/green]")
     
+    download_root = MODEL_DIR
     if WHISPER_LANGUAGE == 'zh':
         model_name = "Huan69/Belle-whisper-large-v3-zh-punct-fasterwhisper"
         local_model = os.path.join(MODEL_DIR, "Belle-whisper-large-v3-zh-punct-fasterwhisper")
@@ -86,14 +104,34 @@ def transcribe_audio(raw_audio_file, vocal_audio_file, start, end):
     if os.path.exists(local_model):
         rprint(f"[green]📥 Loading local WHISPER model:[/green] {local_model} ...")
         model_name = local_model
+        download_root = None
     else:
         rprint(f"[green]📥 Using WHISPER model from HuggingFace:[/green] {model_name} ...")
+        # If the project-local cache is missing or only partially downloaded,
+        # let HuggingFace use the default global cache. This avoids getting
+        # stuck on a half-created ./_model_cache after a network interruption.
+        repo_id = model_name if "/" in model_name else f"Systran/faster-whisper-{model_name}"
+        if not _has_complete_hf_snapshot(MODEL_DIR, repo_id):
+            rprint(
+                "[yellow]⚠️ Project model cache is incomplete; "
+                "falling back to the global HuggingFace cache.[/yellow]"
+            )
+            download_root = None
 
     vad_options = {"vad_onset": 0.500,"vad_offset": 0.363}
     asr_options = {"temperatures": [0],"initial_prompt": "",}
     whisper_language = None if 'auto' in WHISPER_LANGUAGE else WHISPER_LANGUAGE
     rprint("[bold yellow] You can ignore warning of `Model was trained with torch 1.10.0+cu102, yours is 2.0.0+cu118...`[/bold yellow]")
-    model = whisperx.load_model(model_name, device, compute_type=compute_type, language=whisper_language, vad_options=vad_options, asr_options=asr_options, download_root=MODEL_DIR)
+    load_kwargs = dict(
+        device=device,
+        compute_type=compute_type,
+        language=whisper_language,
+        vad_options=vad_options,
+        asr_options=asr_options,
+    )
+    if download_root:
+        load_kwargs["download_root"] = download_root
+    model = whisperx.load_model(model_name, **load_kwargs)
 
     def load_audio_segment(audio_file, start, end):
         # Use whisperx's ffmpeg-based loader instead of librosa.load() which
