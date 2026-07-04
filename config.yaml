@@ -7,7 +7,7 @@
 
 ## ======================== Basic Settings ======================== ##
 
-display_language: "zh-CN"
+display_language: "vi"
 
 # API settings
 api:
@@ -19,7 +19,7 @@ api:
 max_workers: 4
 
 # Language settings, written into the prompt, can be described in natural language
-target_language: '简体中文'
+target_language: 'tiếng việt'
 
 # Whether to use Demucs for vocal separation before transcription
 demucs: false
@@ -71,7 +71,9 @@ pause_before_translate: false
 
 ## ======================== Dubbing Settings ======================== ##
 # TTS selection [sf_fish_tts, openai_tts, gpt_sovits, azure_tts, fish_tts, edge_tts, custom_tts]
-tts_method: 'azure_tts'
+tts_method: 'kokoro_vietnamese_tts'
+# Number of parallel workers for TTS generation (default is 4, set to 1 for gpt_sovits)
+tts_max_workers: 4
 
 # SiliconFlow FishTTS
 sf_fish_tts:
@@ -109,7 +111,7 @@ sf_cosyvoice2:
 
 # Edge TTS configuration
 edge_tts:
-  voice: 'zh-CN-XiaoxiaoNeural'
+  voice: 'vi-VN-NamMinhNeural'
 
 # SoVITS configuration
 gpt_sovits:
@@ -118,6 +120,39 @@ gpt_sovits:
 
 f5tts:
   302_api: 'YOUR_302_API_KEY'
+
+# VieNeu-TTS Vietnamese TTS
+vieneu_tts:
+  # Local default is v3turbo. Use remote when connecting to a VieNeu server.
+  mode: 'v3turbo'
+  # Larger batches keep the GPU busier. Lower this if you hit CUDA out-of-memory.
+  batch_size: 16
+  # CUDA graph is faster for repeated fixed-size batches. Requires repetition_penalty: 1.0.
+  use_cudagraph: true
+  repetition_penalty: 1.0
+  # Built-in voice label. Leave empty when using ref_audio cloning.
+  voice: 'Bình An'
+  # Optional 3-5s reference audio for instant voice cloning.
+  ref_audio: ''
+  ref_text: ''
+  # Remote mode only, for example http://127.0.0.1:23333/v1
+  api_base: ''
+  model_name: ''
+  emotion: 'natural'
+
+# Valtec-TTS Vietnamese TTS
+valtec_tts:
+  # Selected speaker. Options: NF, SF, NM1, SM, NM2 (default is NF)
+  speaker: 'NM1'
+  # Optional path to reference audio for zero-shot cloning. If empty, standard tts is used.
+  ref_audio: ''
+
+# Kokoro Vietnamese TTS
+kokoro_vietnamese_tts:
+  # Voice options are shown in the Streamlit dropdown.
+  voice: 'thanh_dat'
+  # Prefer CUDA when available; backend automatically falls back to CPU when CUDA is unavailable.
+  device: 'cuda'
 
 # *Audio speed range
 speed_factor:

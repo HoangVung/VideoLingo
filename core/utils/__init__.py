@@ -1,6 +1,6 @@
 # use try-except to avoid error when installing
 try:
-    from .ask_gpt import ask_gpt
+    from .ask_gpt import ask_gpt, test_gpt_connection, fetch_gpt_models
     from .decorator import except_handler, check_file_exists
     from .config_utils import load_key, update_key, get_joiner
     from rich import print as rprint
@@ -23,6 +23,8 @@ def check_cancel():
 
 __all__ = [
     "ask_gpt",
+    "test_gpt_connection",
+    "fetch_gpt_models",
     "except_handler",
     "check_file_exists",
     "load_key",

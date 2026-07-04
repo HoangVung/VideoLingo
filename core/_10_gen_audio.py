@@ -29,6 +29,11 @@ def parse_df_srt_time(time_str: str) -> float:
 
 def adjust_audio_speed(input_file: str, output_file: str, speed_factor: float) -> None:
     """Adjust audio speed and handle edge cases"""
+    if speed_factor <= 0:
+        raise ValueError(
+            f"Invalid audio speed factor {speed_factor} for {input_file}. "
+            "Check subtitle timestamps for zero/negative durations."
+        )
     # If the speed factor is close to 1, directly copy the file
     if abs(speed_factor - 1.0) < 0.001:
         shutil.copy2(input_file, output_file)
@@ -78,11 +83,69 @@ def generate_tts_audio(tasks_df: pd.DataFrame) -> pd.DataFrame:
     tasks_df['real_dur'] = 0
     rprint("[bold green]🎯 Starting TTS audio generation...[/bold green]")
     
+    tts_method = load_key("tts_method")
+    if tts_method == "vieneu_tts":
+        try:
+            from core.tts_backend.vieneu_tts import comes_to_batch_viable, vieneu_tts_batch
+            is_viable = comes_to_batch_viable()
+        except Exception:
+            is_viable = False
+
+        if is_viable:
+            rprint("[bold green]🚀 Using VieNeu V3Turbo batch engine for local GPU generation...[/bold green]")
+            # Collect items
+            items = []
+            for _, row in tasks_df.iterrows():
+                number = row['number']
+                lines = eval(row['lines']) if isinstance(row['lines'], str) else row['lines']
+                for line_index, line in enumerate(lines):
+                    items.append({
+                        'number': number,
+                        'line_index': line_index,
+                        'text': line,
+                        'save_as': TEMP_FILE_TEMPLATE.format(f"{number}_{line_index}")
+                    })
+            
+            vieneu_settings = load_key("vieneu_tts")
+            batch_size = vieneu_settings.get("batch_size", 4)
+            if not isinstance(batch_size, int) or batch_size < 1:
+                batch_size = 4
+            use_cudagraph = bool(vieneu_settings.get("use_cudagraph", True))
+            repetition_penalty = vieneu_settings.get("repetition_penalty", 1.0)
+            rprint(
+                "[cyan]VieNeu batch settings: "
+                f"batch_size={batch_size}, "
+                f"use_cudagraph={use_cudagraph}, "
+                f"repetition_penalty={repetition_penalty}[/cyan]"
+            )
+                
+            # Perform batch generation
+            import time
+            start_time = time.time()
+            with Progress() as progress:
+                task = progress.add_task("[cyan]🔄 Generating TTS audio in batches...", total=len(items))
+                vieneu_tts_batch(items, batch_size=batch_size, progress_callback=lambda n: progress.advance(task, n))
+            
+            # After generation, calculate real_dur for each row
+            for _, row in tasks_df.iterrows():
+                number = row['number']
+                lines = eval(row['lines']) if isinstance(row['lines'], str) else row['lines']
+                real_dur = 0
+                for line_index in range(len(lines)):
+                    temp_file = TEMP_FILE_TEMPLATE.format(f"{number}_{line_index}")
+                    if os.path.exists(temp_file):
+                        real_dur += get_audio_duration(temp_file)
+                tasks_df.loc[tasks_df['number'] == number, 'real_dur'] = real_dur
+                
+            elapsed_time = time.time() - start_time
+            rprint(f"[bold green]✨ TTS audio batch generation completed in {elapsed_time:.2f} seconds![/bold green]")
+            return tasks_df
+
     with Progress() as progress:
         task = progress.add_task("[cyan]🔄 Generating TTS audio...", total=len(tasks_df))
         
-        # warm up for first 5 rows
-        warmup_size = min(WARMUP_SIZE, len(tasks_df))
+        # Cloud/API TTS backends do not need a sequential warmup.
+        warmup_size = 0 if load_key("tts_method") in {"edge_tts", "openai_tts", "fish_tts", "azure_tts"} else min(WARMUP_SIZE, len(tasks_df))
         for _, row in tasks_df.head(warmup_size).iterrows():
             try:
                 check_cancel()
@@ -93,8 +156,16 @@ def generate_tts_audio(tasks_df: pd.DataFrame) -> pd.DataFrame:
                 rprint(f"[red]❌ Error in warmup: {str(e)}[/red]")
                 raise e
         
-        # for gpt_sovits, do not use parallel to avoid mistakes
-        max_workers = load_key("max_workers") if load_key("tts_method") != "gpt_sovits" else 1
+        # TTS has its own worker setting; local LLM often keeps max_workers at 1.
+        if load_key("tts_method") == "gpt_sovits":
+            max_workers = 1
+        else:
+            try:
+                max_workers = int(load_key("tts_max_workers"))
+            except Exception:
+                max_workers = int(load_key("max_workers"))
+            max_workers = max(1, max_workers)
+        rprint(f"[cyan]TTS parallel workers: {max_workers}[/cyan]")
         # parallel processing for remaining tasks
         if len(tasks_df) > warmup_size:
             remaining_tasks = tasks_df.iloc[warmup_size:].copy()

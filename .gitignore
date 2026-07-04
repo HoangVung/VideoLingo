@@ -176,3 +176,8 @@ installer_files/
 # Streamlit runtime logs from OneKeyStart.bat
 logs/
 videolingo_*.log
+
+# Local custom ignores
+.venv_old/
+.codex_tmp/
+.compare-HoangVung-VideoLingo/

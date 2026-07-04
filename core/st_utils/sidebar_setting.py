@@ -1,7 +1,64 @@
 import streamlit as st
 import requests
+import os
+import json
+from pathlib import Path
 from translations.translations import translate as t
 from core.utils import *
+from core.tts_backend.kokoro_vietnamese_tts import KOKORO_VOICES
+
+VIENEU_MODES = {
+    "v3turbo": "Local v3 Turbo",
+    "remote": "Remote API",
+}
+
+VIENEU_EMOTIONS = {
+    "natural": "Natural",
+    "storytelling": "Storytelling",
+}
+
+VALTEC_SPEAKERS = {
+    "NF": "NF - Nữ miền Bắc",
+    "SF": "SF - Nữ miền Nam",
+    "NM1": "NM1 - Nam miền Bắc 1",
+    "SM": "SM - Nam miền Nam",
+    "NM2": "NM2 - Nam miền Bắc 2",
+}
+
+def _save_uploaded_reference_audio(uploaded_file):
+    upload_dir = os.path.join("output", "audio", "reference_uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+    filename = os.path.basename(uploaded_file.name).replace(" ", "_")
+    save_path = os.path.join(upload_dir, filename)
+    with open(save_path, "wb") as file:
+        file.write(uploaded_file.getbuffer())
+    return save_path
+
+def _get_vieneu_voice_options():
+    fallback = {
+        "Bình An": "Bình An - nam, giọng điềm đạm",
+        "Ngọc Linh": "Ngọc Linh - nữ, giọng tươi sáng",
+    }
+    try:
+        import sys
+        from pathlib import Path
+        voices_path = Path(sys.prefix) / "Lib" / "site-packages" / "vieneu" / "assets" / "voices_v3_turbo.json"
+        if not voices_path.exists():
+            voices_path = Path(sys.prefix) / "lib" / "site-packages" / "vieneu" / "assets" / "voices_v3_turbo.json"
+        if not voices_path.exists():
+            voices_path = Path(r"d:\0-vung-apps\VideoLingo\.venv\Lib\site-packages\vieneu\assets\voices_v3_turbo.json")
+            
+        data = json.loads(voices_path.read_text(encoding="utf-8"))
+        presets = data.get("presets", {})
+        if not presets:
+            return fallback
+        return {
+            name: f"{name} - {info.get('description', '').strip()}".rstrip(" -")
+            for name, info in presets.items()
+        }
+    except Exception:
+        return fallback
+
 
 
 def config_input(label, key, help=None, placeholder=None):
@@ -242,6 +299,9 @@ def page_setting():
             "custom_tts",
             "sf_cosyvoice2",
             "f5tts",
+            "vieneu_tts",
+            "valtec_tts",
+            "kokoro_vietnamese_tts",
         ]
         tts_method_labels = {
             "azure_tts": t("Azure TTS"),
@@ -253,6 +313,9 @@ def page_setting():
             "custom_tts": t("Custom TTS"),
             "sf_cosyvoice2": t("SiliconFlow CosyVoice2"),
             "f5tts": t("F5-TTS"),
+            "vieneu_tts": t("VieNeu TTS"),
+            "valtec_tts": t("Valtec TTS"),
+            "kokoro_vietnamese_tts": t("Kokoro Vietnamese TTS"),
         }
         select_tts = st.selectbox(
             t("TTS Method"),
@@ -339,6 +402,166 @@ def page_setting():
 
         elif select_tts == "f5tts":
             config_input(t("302ai API"), "f5tts.302_api")
+
+        elif select_tts == "vieneu_tts":
+            st.info(t("VieNeu-TTS requires the `vieneu` Python package."))
+            current_mode = load_key("vieneu_tts.mode")
+            if current_mode not in VIENEU_MODES:
+                current_mode = "v3turbo"
+            selected_mode = st.selectbox(
+                t("VieNeu Mode"),
+                options=list(VIENEU_MODES.keys()),
+                format_func=lambda x: VIENEU_MODES[x],
+                index=list(VIENEU_MODES.keys()).index(current_mode),
+                help="Use Local v3 Turbo unless you already run a VieNeu API server."
+            )
+            if selected_mode != load_key("vieneu_tts.mode"):
+                update_key("vieneu_tts.mode", selected_mode)
+                st.rerun()
+
+            current_emotion = load_key("vieneu_tts.emotion")
+            if current_emotion not in VIENEU_EMOTIONS:
+                current_emotion = "natural"
+            selected_emotion = st.selectbox(
+                t("VieNeu Emotion"),
+                options=list(VIENEU_EMOTIONS.keys()),
+                format_func=lambda emotion: VIENEU_EMOTIONS[emotion],
+                index=list(VIENEU_EMOTIONS.keys()).index(current_emotion),
+            )
+            if selected_emotion != load_key("vieneu_tts.emotion"):
+                update_key("vieneu_tts.emotion", selected_emotion)
+                st.rerun()
+
+            current_ref_audio = load_key("vieneu_tts.ref_audio")
+            voice_mode_options = {
+                "preset": "Use built-in voice",
+                "clone": "Clone from reference audio",
+            }
+            current_voice_mode = "clone" if current_ref_audio else "preset"
+            selected_voice_mode = st.selectbox(
+                t("VieNeu Voice Mode"),
+                options=list(voice_mode_options.keys()),
+                format_func=lambda mode: voice_mode_options[mode],
+                index=list(voice_mode_options.keys()).index(current_voice_mode),
+            )
+
+            if selected_voice_mode == "preset":
+                if current_ref_audio or load_key("vieneu_tts.ref_text"):
+                    update_key("vieneu_tts.ref_audio", "")
+                    update_key("vieneu_tts.ref_text", "")
+                    st.rerun()
+                voice_options = _get_vieneu_voice_options()
+                current_voice = load_key("vieneu_tts.voice")
+                if current_voice not in voice_options:
+                    current_voice = next(iter(voice_options))
+                selected_voice = st.selectbox(
+                    t("VieNeu Voice"),
+                    options=list(voice_options.keys()),
+                    format_func=lambda voice: voice_options[voice],
+                    index=list(voice_options.keys()).index(current_voice),
+                )
+                if selected_voice != load_key("vieneu_tts.voice"):
+                    update_key("vieneu_tts.voice", selected_voice)
+                    st.rerun()
+            else:
+                uploaded_audio = st.file_uploader(
+                    t("VieNeu Reference Audio"),
+                    type=load_key("allowed_audio_formats"),
+                    help="Upload a short, clear 3-10 second voice sample for cloning."
+                )
+                if uploaded_audio is not None:
+                    saved_ref_audio = _save_uploaded_reference_audio(uploaded_audio)
+                    if saved_ref_audio != load_key("vieneu_tts.ref_audio"):
+                        update_key("vieneu_tts.ref_audio", saved_ref_audio)
+                        st.rerun()
+                config_input(t("VieNeu Reference Audio Path"), "vieneu_tts.ref_audio", help="Optional manual path to the reference audio file.")
+                if selected_mode == "remote":
+                    config_input(t("VieNeu Reference Text"), "vieneu_tts.ref_text", help="Optional transcript of the reference audio for remote VieNeu.")
+
+            if selected_mode == "remote":
+                config_input(t("VieNeu API Base"), "vieneu_tts.api_base")
+                config_input(t("VieNeu Model Name"), "vieneu_tts.model_name")
+
+        elif select_tts == "valtec_tts":
+            st.info(t("Valtec-TTS requires the `valtec_tts` package. If not installed, run: .\\.venv\\Scripts\\python.exe -m pip install git+https://github.com/tronghieuit/valtec-tts.git"))
+            current_speaker = load_key("valtec_tts.speaker")
+            if current_speaker not in VALTEC_SPEAKERS:
+                current_speaker = "NF"
+            selected_speaker = st.selectbox(
+                t("Valtec Speaker"),
+                options=list(VALTEC_SPEAKERS.keys()),
+                format_func=lambda speaker: VALTEC_SPEAKERS[speaker],
+                index=list(VALTEC_SPEAKERS.keys()).index(current_speaker),
+                help="Built-in Valtec voices. NF/SF are female voices, NM1/SM/NM2 are male voices."
+            )
+            if selected_speaker != load_key("valtec_tts.speaker"):
+                update_key("valtec_tts.speaker", selected_speaker)
+                st.rerun()
+
+            current_ref_audio = load_key("valtec_tts.ref_audio")
+            mode_options = {
+                "speaker": "Use built-in speaker",
+                "clone": "Clone from reference audio",
+            }
+            current_mode = "clone" if current_ref_audio else "speaker"
+            selected_mode = st.selectbox(
+                t("Valtec Mode"),
+                options=list(mode_options.keys()),
+                format_func=lambda mode: mode_options[mode],
+                index=list(mode_options.keys()).index(current_mode),
+                help="Reference audio is only needed when cloning a voice."
+            )
+
+            if selected_mode == "speaker":
+                if current_ref_audio:
+                    update_key("valtec_tts.ref_audio", "")
+                    st.rerun()
+                st.caption("Reference audio is not used in built-in speaker mode.")
+            else:
+                uploaded_audio = st.file_uploader(
+                    t("Valtec Reference Audio"),
+                    type=load_key("allowed_audio_formats"),
+                    help="Upload a short, clear 3-10 second voice sample for cloning."
+                )
+                if uploaded_audio is not None:
+                    saved_ref_audio = _save_uploaded_reference_audio(uploaded_audio)
+                    if saved_ref_audio != load_key("valtec_tts.ref_audio"):
+                        update_key("valtec_tts.ref_audio", saved_ref_audio)
+                        st.rerun()
+                config_input(t("Valtec Reference Audio Path"), "valtec_tts.ref_audio", help="Optional manual path to the reference audio file.")
+
+        elif select_tts == "kokoro_vietnamese_tts":
+            st.info(t("Kokoro Vietnamese TTS requires the `kokoro-vietnamese` package. If not installed, run: .\\.venv\\Scripts\\python.exe -m pip install git+https://github.com/iamdinhthuan/Kokoro-Vietnamese.git"))
+
+            current_voice = load_key("kokoro_vietnamese_tts.voice")
+            if current_voice not in KOKORO_VOICES:
+                current_voice = "diem_trinh"
+            selected_voice = st.selectbox(
+                t("Kokoro Vietnamese Voice"),
+                options=list(KOKORO_VOICES.keys()),
+                format_func=lambda voice: KOKORO_VOICES[voice],
+                index=list(KOKORO_VOICES.keys()).index(current_voice),
+            )
+            if selected_voice != load_key("kokoro_vietnamese_tts.voice"):
+                update_key("kokoro_vietnamese_tts.voice", selected_voice)
+                st.rerun()
+
+            device_options = {
+                "cuda": "GPU CUDA if available",
+                "cpu": "CPU",
+            }
+            current_device = load_key("kokoro_vietnamese_tts.device")
+            if current_device not in device_options:
+                current_device = "cuda"
+            selected_device = st.selectbox(
+                t("Kokoro Vietnamese Device"),
+                options=list(device_options.keys()),
+                format_func=lambda device: device_options[device],
+                index=list(device_options.keys()).index(current_device),
+            )
+            if selected_device != load_key("kokoro_vietnamese_tts.device"):
+                update_key("kokoro_vietnamese_tts.device", selected_device)
+                st.rerun()
 
 
 def check_api():

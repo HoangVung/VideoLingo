@@ -13,6 +13,9 @@ from core.tts_backend.sf_cosyvoice2 import cosyvoice_tts_for_videolingo
 from core.tts_backend.custom_tts import custom_tts
 from core.prompts import get_correct_text_prompt
 from core.tts_backend._302_f5tts import f5_tts_for_videolingo
+from core.tts_backend.vieneu_tts import vieneu_tts
+from core.tts_backend.valtec_tts import valtec_tts
+from core.tts_backend.kokoro_vietnamese_tts import kokoro_vietnamese_tts
 from core.utils import *
 
 def clean_text_for_tts(text):
@@ -36,6 +39,8 @@ def tts_main(text, save_as, number, task_df):
     if os.path.exists(save_as):
         return
     
+    import time
+    start_time = time.time()
     print(f"Generating <{text}...>")
     TTS_METHOD = load_key("tts_method")
     
@@ -64,10 +69,18 @@ def tts_main(text, save_as, number, task_df):
                 cosyvoice_tts_for_videolingo(text, save_as, number, task_df)
             elif TTS_METHOD == 'f5tts':
                 f5_tts_for_videolingo(text, save_as, number, task_df)
+            elif TTS_METHOD == 'vieneu_tts':
+                vieneu_tts(text, save_as, number, task_df)
+            elif TTS_METHOD == 'valtec_tts':
+                valtec_tts(text, save_as, number, task_df)
+            elif TTS_METHOD == 'kokoro_vietnamese_tts':
+                kokoro_vietnamese_tts(text, save_as, number, task_df)
                 
             # Check generated audio duration
             duration = get_audio_duration(save_as)
             if duration > 0:
+                elapsed_time = time.time() - start_time
+                print(f"✓ Generated in {elapsed_time:.2f}s")
                 break
             else:
                 if os.path.exists(save_as):
