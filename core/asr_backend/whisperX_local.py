@@ -4,9 +4,14 @@ import time
 import subprocess
 import torch
 import functools
+import logging
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
+
+# Prevent duplicate log messages on console by disabling propagation
+for logger_name in ["whisperx", "pyannote", "lightning", "pytorch_lightning"]:
+    logging.getLogger(logger_name).propagate = False
 
 # =============================================================================
 # Compatibility shim — applied BEFORE importing whisperx

@@ -11,8 +11,8 @@ display_language: "vi"
 
 # API settings
 api:
-  key: 'YOUR_API_KEY'
-  base_url: 'https://yunwu.ai'
+  key: 'sk-bojKQkm3x9Or4H0ZCVsmKilqEpE14HfRLBnYMpR20Y8puekG'
+  base_url: 'https://yunwu.ai/v1'
   model: 'gpt-5.5'
   llm_support_json: false
 # *Number of LLM multi-threaded accesses, set to 1 if using local LLM
@@ -28,7 +28,7 @@ whisper:
   # ["large-v3", "large-v3-turbo"]. Note: for zh model will force to use Belle/large-v3
   model: 'large-v3'
   # Whisper specified recognition language ISO 639-1
-  language: 'en'
+  language: 'zh'
   detected_language: 'en'
   # Whisper running mode ["local", "cloud", "elevenlabs"]. Specifies where to run, cloud uses 302.ai API
   runtime: 'local'
@@ -38,7 +38,7 @@ whisper:
   elevenlabs_api_key: 'your_elevenlabs_api_key'
 
 # Whether to burn subtitles into the video
-burn_subtitles: true
+burn_subtitles: false
 
 ## ======================== Advanced Settings ======================== ##
 # *🔬 h264_nvenc GPU acceleration for ffmpeg, make sure your GPU supports it
@@ -71,7 +71,7 @@ pause_before_translate: false
 
 ## ======================== Dubbing Settings ======================== ##
 # TTS selection [sf_fish_tts, openai_tts, gpt_sovits, azure_tts, fish_tts, edge_tts, custom_tts]
-tts_method: 'kokoro_vietnamese_tts'
+tts_method: 'openai_tts'
 # Number of parallel workers for TTS generation (default is 4, set to 1 for gpt_sovits)
 tts_max_workers: 4
 
@@ -89,7 +89,7 @@ sf_fish_tts:
 
 # OpenAI TTS-1 API configuration, 302.ai API only
 openai_tts:
-  api_key: 'YOUR_302_API_KEY'
+  api_key: 'sk-bojKQkm3x9Or4H0ZCVsmKilqEpE14HfRLBnYMpR20Y8puekG'
   voice: 'alloy'
 
 # Azure configuration, 302.ai API only
