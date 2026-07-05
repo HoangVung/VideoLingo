@@ -166,5 +166,8 @@
 ,
   "Kokoro Vietnamese TTS requires the `kokoro-vietnamese` package. If not installed, run: .\\.venv\\Scripts\\python.exe -m pip install git+https://github.com/iamdinhthuan/Kokoro-Vietnamese.git": "Kokoro Vietnamese TTS yeu cau thu vien `kokoro-vietnamese`. Neu chua cai dat, vui long chay: .\\.venv\\Scripts\\python.exe -m pip install git+https://github.com/iamdinhthuan/Kokoro-Vietnamese.git",
   "Kokoro Vietnamese Voice": "Giong Kokoro Vietnamese",
-  "Kokoro Vietnamese Device": "Thiet bi Kokoro Vietnamese"
+  "Kokoro Vietnamese Device": "Thiet bi Kokoro Vietnamese",
+  "VieNeu TTS": "VieNeu TTS",
+  "Valtec TTS": "Valtec TTS",
+  "Kokoro Vietnamese TTS": "Kokoro Vietnamese TTS"
 }
