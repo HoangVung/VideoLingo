@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import re
+from difflib import SequenceMatcher
 from rich.panel import Panel
 from rich.console import Console
 import autocorrect_py as autocorrect
@@ -76,6 +77,8 @@ def get_sentence_timestamps(df_words, df_sentences):
         sentence_len = len(clean_sentence)
         
         match_found = False
+        start_pos = current_pos
+        
         while current_pos <= len(full_words_str) - sentence_len:
             if full_words_str[current_pos:current_pos+sentence_len] == clean_sentence:
                 start_word_idx = position_to_word_idx[current_pos]
@@ -90,6 +93,41 @@ def get_sentence_timestamps(df_words, df_sentences):
                 match_found = True
                 break
             current_pos += 1
+            
+        if not match_found:
+            # Try fuzzy matching fallback around the original position
+            search_start = max(0, start_pos - 50)
+            search_end = min(len(full_words_str), start_pos + sentence_len + 150)
+            
+            best_ratio = 0
+            best_match_pos = -1
+            best_L = sentence_len
+            
+            # Try lengths from sentence_len - 6 to sentence_len + 6
+            for L in range(max(1, sentence_len - 6), sentence_len + 7):
+                for pos in range(search_start, search_end - L + 1):
+                    sub = full_words_str[pos:pos+L]
+                    ratio = SequenceMatcher(None, sub, clean_sentence).ratio()
+                    if ratio > best_ratio:
+                        best_ratio = ratio
+                        best_match_pos = pos
+                        best_L = L
+            
+            if best_ratio >= 0.70:
+                start_word_idx = position_to_word_idx[best_match_pos]
+                end_word_idx = position_to_word_idx[best_match_pos + best_L - 1]
+                
+                time_stamp_list.append((
+                    float(df_words['start'][start_word_idx]),
+                    float(df_words['end'][end_word_idx])
+                ))
+                
+                current_pos = best_match_pos + best_L
+                match_found = True
+                print(f"Fuzzy match fallback: matched '{sentence}' at position {best_match_pos} with ratio {best_ratio:.3f} and length {best_L}")
+            else:
+                # Restore current_pos so warning prints correctly
+                current_pos = start_pos
             
         if not match_found:
             print(f"\n⚠️ Warning: No exact match found for sentence: {sentence}")
