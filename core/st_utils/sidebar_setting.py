@@ -67,13 +67,19 @@ def _glossary_settings():
 
         uploaded = st.file_uploader(t("Upload glossary JSON"), type=["json"])
         if uploaded is not None:
-            os.makedirs("glossaries", exist_ok=True)
-            save_path = os.path.join("glossaries", "olympiad_math_zh_vi_glossary.json")
-            with open(save_path, "wb") as file:
-                file.write(uploaded.getbuffer())
-            _safe_update_key("glossary.path", save_path)
-            st.success(t("Glossary uploaded."))
-            st.rerun()
+            # Track which file was already processed to avoid infinite rerun loop.
+            # st.file_uploader retains the file after st.rerun(), so without this
+            # guard the block fires on every rerun → flicker.
+            upload_id = f"{uploaded.name}_{uploaded.size}"
+            if st.session_state.get("_glossary_last_upload_id") != upload_id:
+                os.makedirs("glossaries", exist_ok=True)
+                save_path = os.path.join("glossaries", uploaded.name)
+                with open(save_path, "wb") as file:
+                    file.write(uploaded.getbuffer())
+                _safe_update_key("glossary.path", save_path)
+                st.session_state["_glossary_last_upload_id"] = upload_id
+                st.success(t("Glossary uploaded."))
+                st.rerun()
 
         auto_normalize = st.toggle(
             t("Auto normalize source transcript"),

@@ -87,13 +87,19 @@ def get_summary_prompt(source_content, custom_terms_json=None):
     src_lang = get_src_language()
     tgt_lang = load_key("target_language")
     
-    # add custom terms note
+    # add custom terms note – only list source names to save tokens;
+    # the summary step just needs to know which terms to skip.
     terms_note = ""
     if custom_terms_json:
-        terms_list = []
-        for term in custom_terms_json['terms']:
-            terms_list.append(f"- {term['src']}: {term['tgt']} ({term['note']})")
-        terms_note = "\n### Existing Terms\nPlease exclude these terms in your extraction:\n" + "\n".join(terms_list)
+        MAX_TERMS_IN_PROMPT = 30
+        src_names = [term['src'] for term in custom_terms_json['terms']]
+        if len(src_names) > MAX_TERMS_IN_PROMPT:
+            src_names = src_names[:MAX_TERMS_IN_PROMPT]
+        terms_note = (
+            "\n### Existing Terms\n"
+            "Please exclude these terms in your extraction:\n"
+            + ", ".join(src_names)
+        )
     
     summary_prompt = f"""
 ## Role

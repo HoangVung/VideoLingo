@@ -125,7 +125,7 @@ def _get_text_draft_steps():
         from core.glossary_utils import prepare_glossary_for_translation
 
         result = prepare_glossary_for_translation()
-        rprint("Glossary preparation result:", result)
+        print("Glossary preparation result:", result)
 
     return [
         (t("WhisperX word-level transcription"), _2_asr.transcribe),
