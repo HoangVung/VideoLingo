@@ -52,8 +52,14 @@ def split_sentence(sentence, num_parts, word_limit=20, index=-1, retry_attempt=0
         choice = response_data["choice"]
         if f'split{choice}' not in response_data:
             return {"status": "error", "message": "Missing required key: `split`"}
-        if "[br]" not in response_data[f"split{choice}"]:
+        split_text = response_data[f"split{choice}"]
+        if "[br]" not in split_text:
             return {"status": "error", "message": "Split failed, no [br] found"}
+        # Guard against small models echoing the placeholder from the prompt template
+        clean_split = split_text.replace("[br]", "").replace(" ", "").lower()
+        clean_orig = sentence.replace(" ", "").lower()
+        if SequenceMatcher(None, clean_split, clean_orig).ratio() < 0.5:
+            return {"status": "error", "message": "Split result does not resemble original sentence (possible placeholder echo)"}
         return {"status": "success", "message": "Split completed"}
     
     response_data = ask_gpt(split_prompt + " " * retry_attempt, resp_type='json', valid_def=valid_split, log_title='split_by_meaning')
