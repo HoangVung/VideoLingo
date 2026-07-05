@@ -122,8 +122,10 @@ def _clear_path(path):
 def _get_text_draft_steps():
     """Return subtitle draft steps b.1-b.3 as (label, callable) list."""
     def _prepare_glossary_terms():
+        from core._3_2_split_meaning import repair_split_file
         from core.glossary_utils import prepare_glossary_for_translation
 
+        repair_split_file()
         result = prepare_glossary_for_translation()
         print("Glossary preparation result:", result)
 

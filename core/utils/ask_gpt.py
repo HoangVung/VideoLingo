@@ -204,10 +204,23 @@ def ask_gpt(prompt, resp_type=None, valid_def=None, log_title="default", max_tok
     # check cache
     cached = _load_cache(prompt, resp_type, log_title)
     if cached:
-        rprint("use cache response")
         if resp_type == "json":
             cached = _coerce_json_response(cached)
-        return cached
+        
+        is_valid = True
+        if valid_def:
+            try:
+                valid_resp = valid_def(cached)
+                if valid_resp['status'] != 'success':
+                    is_valid = False
+                    rprint(f"[yellow]Warning: Cached response failed validation: {valid_resp['message']}. Discarding cache and requesting fresh response.[/yellow]")
+            except Exception as e:
+                is_valid = False
+                rprint(f"[yellow]Warning: Error validating cached response: {e}. Discarding cache and requesting fresh response.[/yellow]")
+        
+        if is_valid:
+            rprint("use cache response")
+            return cached
 
     model = api_settings["model"]
     client = OpenAI(api_key=api_settings["api_key"], base_url=api_settings["base_url"])
