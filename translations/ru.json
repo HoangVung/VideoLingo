@@ -154,5 +154,19 @@
     "Finalize subtitle outputs": "Финализировать вывод субтитров",
     "Finalize dubbing outputs": "Финализировать вывод дубляжа",
     "Reflect Translate (2-step)": "Двухэтапный перевод (прямой + свободный)",
-    "Use two-step translation (direct + free) for more natural results, but costs double the API tokens.": "Используйте двухэтапный перевод (дословный + художественный) для получения более естественных результатов, но это потребует в два раза больше токенов API."
+    "Use two-step translation (direct + free) for more natural results, but costs double the API tokens.": "Используйте двухэтапный перевод (дословный + художественный) для получения более естественных результатов, но это потребует в два раза больше токенов API.",
+    "Glossary Settings": "Glossary Settings",
+    "Enable glossary": "Enable glossary",
+    "Glossary JSON path": "Glossary JSON path",
+    "Upload glossary JSON": "Upload glossary JSON",
+    "Glossary uploaded.": "Glossary uploaded.",
+    "Auto normalize source transcript": "Auto normalize source transcript",
+    "Auto build custom terms": "Auto build custom terms",
+    "Max glossary terms": "Max glossary terms",
+    "Always include ASR/OCR correction terms": "Always include ASR/OCR correction terms",
+    "Validate glossary": "Validate glossary",
+    "Build custom terms now": "Build custom terms now",
+    "Glossary is valid.": "Glossary is valid.",
+    "Glossary is invalid.": "Glossary is invalid.",
+    "Prepare glossary terms": "Prepare glossary terms"
 }

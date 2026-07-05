@@ -154,5 +154,19 @@
     "Finalize subtitle outputs": "Finaliser les sorties de sous-titres",
     "Finalize dubbing outputs": "Finaliser les sorties de doublage",
     "Reflect Translate (2-step)": "Traduction réflective (2 étapes)",
-    "Use two-step translation (direct + free) for more natural results, but costs double the API tokens.": "Utilisez la traduction en deux étapes (directe + libre) pour des résultats plus naturels, mais coûte le double de jetons d'API."
+    "Use two-step translation (direct + free) for more natural results, but costs double the API tokens.": "Utilisez la traduction en deux étapes (directe + libre) pour des résultats plus naturels, mais coûte le double de jetons d'API.",
+    "Glossary Settings": "Glossary Settings",
+    "Enable glossary": "Enable glossary",
+    "Glossary JSON path": "Glossary JSON path",
+    "Upload glossary JSON": "Upload glossary JSON",
+    "Glossary uploaded.": "Glossary uploaded.",
+    "Auto normalize source transcript": "Auto normalize source transcript",
+    "Auto build custom terms": "Auto build custom terms",
+    "Max glossary terms": "Max glossary terms",
+    "Always include ASR/OCR correction terms": "Always include ASR/OCR correction terms",
+    "Validate glossary": "Validate glossary",
+    "Build custom terms now": "Build custom terms now",
+    "Glossary is valid.": "Glossary is valid.",
+    "Glossary is invalid.": "Glossary is invalid.",
+    "Prepare glossary terms": "Prepare glossary terms"
 }

@@ -161,5 +161,19 @@
     "Suggested: 50-90. Lower if a subtitle line looks crowded on screen; raise if lines are split too aggressively.": "建議 50-90。如果一行字幕看著擠就調小；如果一句話被拆得太碎就調大。",
     "Restore defaults ({split}/{length})": "恢復預設值（{split}/{length}）",
     "Reflect Translate (2-step)": "雙步精譯 (Reflect Translation)",
-    "Use two-step translation (direct + free) for more natural results, but costs double the API tokens.": "使用雙步翻譯（直譯 + 意譯）以獲得更自然的结果，但會消耗雙倍的 API Token。"
+    "Use two-step translation (direct + free) for more natural results, but costs double the API tokens.": "使用雙步翻譯（直譯 + 意譯）以獲得更自然的结果，但會消耗雙倍的 API Token。",
+    "Glossary Settings": "Glossary Settings",
+    "Enable glossary": "Enable glossary",
+    "Glossary JSON path": "Glossary JSON path",
+    "Upload glossary JSON": "Upload glossary JSON",
+    "Glossary uploaded.": "Glossary uploaded.",
+    "Auto normalize source transcript": "Auto normalize source transcript",
+    "Auto build custom terms": "Auto build custom terms",
+    "Max glossary terms": "Max glossary terms",
+    "Always include ASR/OCR correction terms": "Always include ASR/OCR correction terms",
+    "Validate glossary": "Validate glossary",
+    "Build custom terms now": "Build custom terms now",
+    "Glossary is valid.": "Glossary is valid.",
+    "Glossary is invalid.": "Glossary is invalid.",
+    "Prepare glossary terms": "Prepare glossary terms"
 }
