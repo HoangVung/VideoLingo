@@ -34,6 +34,124 @@ def _save_uploaded_reference_audio(uploaded_file):
         file.write(uploaded_file.getbuffer())
     return save_path
 
+
+def _safe_update_key(key, value):
+    try:
+        update_key(key, value)
+        return True
+    except Exception:
+        return False
+
+
+def _glossary_settings():
+    from core.glossary_utils import (
+        build_custom_terms_from_glossary,
+        get_glossary_config,
+        validate_glossary,
+    )
+
+    cfg = get_glossary_config()
+    with st.expander(t("Glossary Settings"), expanded=False):
+        enabled = st.toggle(t("Enable glossary"), value=bool(cfg.get("enabled", False)))
+        if enabled != cfg.get("enabled", False):
+            _safe_update_key("glossary.enabled", enabled)
+            st.rerun()
+
+        glossary_path = st.text_input(
+            t("Glossary JSON path"),
+            value=str(cfg.get("path") or "glossaries/olympiad_math_zh_vi_glossary.json"),
+        )
+        if glossary_path != cfg.get("path"):
+            _safe_update_key("glossary.path", glossary_path)
+            st.rerun()
+
+        uploaded = st.file_uploader(t("Upload glossary JSON"), type=["json"])
+        if uploaded is not None:
+            os.makedirs("glossaries", exist_ok=True)
+            save_path = os.path.join("glossaries", "olympiad_math_zh_vi_glossary.json")
+            with open(save_path, "wb") as file:
+                file.write(uploaded.getbuffer())
+            _safe_update_key("glossary.path", save_path)
+            st.success(t("Glossary uploaded."))
+            st.rerun()
+
+        auto_normalize = st.toggle(
+            t("Auto normalize source transcript"),
+            value=bool(cfg.get("auto_normalize_source", True)),
+        )
+        if auto_normalize != cfg.get("auto_normalize_source", True):
+            _safe_update_key("glossary.auto_normalize_source", auto_normalize)
+            st.rerun()
+
+        auto_build = st.toggle(
+            t("Auto build custom terms"),
+            value=bool(cfg.get("auto_build_custom_terms", True)),
+        )
+        if auto_build != cfg.get("auto_build_custom_terms", True):
+            _safe_update_key("glossary.auto_build_custom_terms", auto_build)
+            st.rerun()
+
+        max_terms = st.number_input(
+            t("Max glossary terms"),
+            min_value=20,
+            max_value=500,
+            value=int(cfg.get("max_terms", 120)),
+            step=1,
+        )
+        if int(max_terms) != int(cfg.get("max_terms", 120)):
+            _safe_update_key("glossary.max_terms", int(max_terms))
+            st.rerun()
+
+        always_include_asr = st.toggle(
+            t("Always include ASR/OCR correction terms"),
+            value=bool(cfg.get("always_include_asr", True)),
+        )
+        if always_include_asr != cfg.get("always_include_asr", True):
+            _safe_update_key("glossary.always_include_asr", always_include_asr)
+            st.rerun()
+
+        if st.button(t("Validate glossary"), use_container_width=True):
+            validation = validate_glossary(glossary_path)
+            if validation.get("ok"):
+                st.success(t("Glossary is valid."))
+                st.write(
+                    {
+                        "version": validation.get("version", ""),
+                        "domains": validation.get("domain_count", 0),
+                        "terms": validation.get("total_terms", 0),
+                        "has_asr_ocr_corrections": validation.get(
+                            "has_asr_ocr_corrections", False
+                        ),
+                    }
+                )
+            else:
+                st.warning(
+                    "\n".join(validation.get("warnings", []))
+                    or t("Glossary is invalid.")
+                )
+
+        if st.button(t("Build custom terms now"), use_container_width=True):
+            if not os.path.exists("output/log/split_by_meaning.txt"):
+                st.warning(
+                    "Please run b.1-3 until sentence segmentation first, or use always-include ASR terms only."
+                )
+            result = build_custom_terms_from_glossary(
+                glossary_path=glossary_path,
+                transcript_path="output/log/split_by_meaning.txt",
+                output_path="custom_terms.xlsx",
+                max_terms=int(max_terms),
+                always_include_asr=bool(always_include_asr),
+            )
+            if result.get("ok"):
+                st.success(
+                    f"Exported {result.get('selected_terms', 0)} terms to custom_terms.xlsx."
+                )
+            else:
+                st.warning(
+                    "\n".join(result.get("warnings", []))
+                    or "No custom terms were exported."
+                )
+
 def _get_vieneu_voice_options():
     fallback = {
         "Bình An": "Bình An - nam, giọng điềm đạm",
@@ -268,6 +386,17 @@ def page_setting():
             update_key("demucs", demucs)
             st.rerun()
 
+        reflect_translate = st.toggle(
+            t("Reflect Translate (2-step)"),
+            value=load_key("reflect_translate"),
+            help=t(
+                "Use two-step translation (direct + free) for more natural results, but costs double the API tokens."
+            ),
+        )
+        if reflect_translate != load_key("reflect_translate"):
+            update_key("reflect_translate", reflect_translate)
+            st.rerun()
+
         from core._1_ytdlp import is_audio_only_input
         audio_only = is_audio_only_input()
         if audio_only:
@@ -288,6 +417,7 @@ def page_setting():
             if burn_subtitles != load_key("burn_subtitles"):
                 update_key("burn_subtitles", burn_subtitles)
                 st.rerun()
+    _glossary_settings()
     with st.expander(t("Dubbing Settings"), expanded=True):
         tts_methods = [
             "azure_tts",

@@ -152,5 +152,7 @@
     "Media file detection failed: {error}": "Échec de la détection du fichier média : {error}",
     "Clear output and reselect": "Effacer la sortie et resélectionner",
     "Finalize subtitle outputs": "Finaliser les sorties de sous-titres",
-    "Finalize dubbing outputs": "Finaliser les sorties de doublage"
+    "Finalize dubbing outputs": "Finaliser les sorties de doublage",
+    "Reflect Translate (2-step)": "Traduction réflective (2 étapes)",
+    "Use two-step translation (direct + free) for more natural results, but costs double the API tokens.": "Utilisez la traduction en deux étapes (directe + libre) pour des résultats plus naturels, mais coûte le double de jetons d'API."
 }

@@ -11,9 +11,9 @@ display_language: "vi"
 
 # API settings
 api:
-  key: 'sk-bojKQkm3x9Or4H0ZCVsmKilqEpE14HfRLBnYMpR20Y8puekG'
-  base_url: 'https://yunwu.ai/v1'
-  model: 'gpt-5.5'
+  key: 'LM Studio'
+  base_url: 'http://127.0.0.1:1234'
+  model: 'qwen2.5-3b-instruct'
   llm_support_json: false
 # *Number of LLM multi-threaded accesses, set to 1 if using local LLM
 max_workers: 4
@@ -53,7 +53,7 @@ ytb_resolution: '1080'
 
 subtitle:
   # *Maximum length of each subtitle line in characters
-  max_length: 75
+  max_length: 60
   # *Translated subtitles are slightly larger than source subtitles, affecting the reference length for subtitle splitting
   target_multiplier: 1.2
 
@@ -61,17 +61,25 @@ subtitle:
 summary_length: 8000
 
 # *Maximum number of words for the first rough cut, below 18 will cut too finely affecting translation, above 22 is too long and will make subsequent subtitle splitting difficult to align
-max_split_length: 20
+max_split_length: 15
 
 # *Whether to reflect the translation result in the original text
-reflect_translate: true
+reflect_translate: false
 
 # *Whether to pause after extracting professional terms and before translation, allowing users to manually adjust the terminology table output\log\terminology.json
 pause_before_translate: false
 
+glossary:
+  enabled: true
+  path: "glossaries/olympiad_math_zh_vi_glossary.json"
+  auto_build_custom_terms: true
+  auto_normalize_source: true
+  max_terms: 120
+  always_include_asr: true
+
 ## ======================== Dubbing Settings ======================== ##
 # TTS selection [sf_fish_tts, openai_tts, gpt_sovits, azure_tts, fish_tts, edge_tts, custom_tts]
-tts_method: 'openai_tts'
+tts_method: 'kokoro_vietnamese_tts'
 # Number of parallel workers for TTS generation (default is 4, set to 1 for gpt_sovits)
 tts_max_workers: 4
 
@@ -150,7 +158,7 @@ valtec_tts:
 # Kokoro Vietnamese TTS
 kokoro_vietnamese_tts:
   # Voice options are shown in the Streamlit dropdown.
-  voice: 'thanh_dat'
+  voice: 'manh_dung'
   # Prefer CUDA when available; backend automatically falls back to CPU when CUDA is unavailable.
   device: 'cuda'
 

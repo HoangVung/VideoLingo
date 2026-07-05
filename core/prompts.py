@@ -1,10 +1,24 @@
 import json
 from core.utils import *
 
+def get_src_language():
+    whisper_language = load_key("whisper.language")
+    return load_key("whisper.detected_language") if whisper_language == 'auto' else whisper_language
+
 ## ================================================================
 # @ step4_splitbymeaning.py
 def get_split_prompt(sentence, num_parts = 2, word_limit = 20):
-    language = load_key("whisper.detected_language")
+    language = get_src_language()
+    
+    if language in ['zh', 'zh-cn', 'zh-tw', 'zh-CN', 'zh-TW', 'Chinese']:
+        example_given = "我们今天主要的任务的话就不再是练题了"
+        example_split1 = "我们今天主要的任务的话 [br] 就不再是练题了"
+        example_split2 = "辅助方式：我们今天主要的任务 [br] 的话就不再是练题了"
+    else:
+        example_given = "Today our main task is no longer practicing problems"
+        example_split1 = "Today our main task [br] is no longer practicing problems"
+        example_split2 = "Today our main task is [br] no longer practicing problems"
+
     split_prompt = f"""
 ## Role
 You are a professional Netflix subtitle splitter in **{language}**.
@@ -16,12 +30,31 @@ Split the given subtitle text into **{num_parts}** parts, each less than **{word
 2. MOST IMPORTANT: Keep parts roughly equal in length (minimum 3 words each)
 3. Split at natural points like punctuation marks or conjunctions
 4. If provided text is repeated words, simply split at the middle of the repeated words.
+5. You MUST use exactly "[br]" as the splitting tag between parts. Do not use brackets like "[part1] [part2]" or nested brackets.
 
 ## Steps
 1. Analyze the sentence structure, complexity, and key splitting challenges
 2. Generate two alternative splitting approaches with [br] tags at split positions
 3. Compare both approaches highlighting their strengths and weaknesses
 4. Choose the best splitting approach
+
+## Example
+For a sentence to be split into 2 parts:
+Given Text:
+<split_this_sentence>
+{example_given}
+</split_this_sentence>
+
+Output:
+```json
+{{
+    "analysis": "The sentence is a single clause but is too long. A natural split point is after the subject phrase.",
+    "split1": "{example_split1}",
+    "split2": "{example_split2}",
+    "assess": "split1 splits cleanly after the subject marker. split2 splits slightly earlier, which is also grammatically correct.",
+    "choice": "1"
+}}
+```
 
 ## Given Text
 <split_this_sentence>
@@ -51,7 +84,7 @@ Note: Start you answer with ```json and end with ```, do not add any other text.
 ## ================================================================
 # @ step4_1_summarize.py
 def get_summary_prompt(source_content, custom_terms_json=None):
-    src_lang = load_key("whisper.detected_language")
+    src_lang = get_src_language()
     tgt_lang = load_key("target_language")
     
     # add custom terms note
@@ -151,7 +184,7 @@ def get_prompt_faithfulness(lines, shared_prompt):
         json_dict[f"{i}"] = {"origin": line, "direct": f"direct {TARGET_LANGUAGE} translation {i}."}
     json_format = json.dumps(json_dict, indent=2, ensure_ascii=False)
 
-    src_language = load_key("whisper.detected_language")
+    src_language = get_src_language()
     prompt_faithfulness = f'''
 ## Role
 You are a professional Netflix subtitle translator, fluent in both {src_language} and {TARGET_LANGUAGE}, as well as their respective cultures. 
@@ -200,7 +233,7 @@ def get_prompt_expressiveness(faithfulness_result, lines, shared_prompt):
     }
     json_format = json.dumps(json_format, indent=2, ensure_ascii=False)
 
-    src_language = load_key("whisper.detected_language")
+    src_language = get_src_language()
     prompt_expressiveness = f'''
 ## Role
 You are a professional Netflix subtitle translator and language consultant.
@@ -251,7 +284,7 @@ Note: Start you answer with ```json and end with ```, do not add any other text.
 # @ step6_splitforsub.py
 def get_align_prompt(src_sub, tr_sub, src_part):
     targ_lang = load_key("target_language")
-    src_lang = load_key("whisper.detected_language")
+    src_lang = get_src_language()
     src_splits = src_part.split('\n')
     num_parts = len(src_splits)
     src_part = src_part.replace('\n', ' [br] ')

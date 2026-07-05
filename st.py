@@ -15,7 +15,7 @@ from core.st_utils.imports_and_utils import *
 from core.st_utils.task_runner import TaskRunner
 from core import *
 from translations.translations import DISPLAY_LANGUAGES, init_display_language, set_display_language
-from core.utils.models import _TEXT_DONE_MARKER, _AUDIO_DONE_MARKER
+from core.utils.models import _4_2_TRANSLATION, _TEXT_DONE_MARKER, _AUDIO_DONE_MARKER
 
 # SET PATH
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -119,9 +119,15 @@ def _clear_path(path):
             pass
 
 
-def _get_text_steps():
-    """Return the subtitle processing steps as (label, callable) list."""
-    steps = [
+def _get_text_draft_steps():
+    """Return subtitle draft steps b.1-b.3 as (label, callable) list."""
+    def _prepare_glossary_terms():
+        from core.glossary_utils import prepare_glossary_for_translation
+
+        result = prepare_glossary_for_translation()
+        rprint("Glossary preparation result:", result)
+
+    return [
         (t("WhisperX word-level transcription"), _2_asr.transcribe),
         (
             t("Sentence segmentation using NLP and LLM"),
@@ -130,10 +136,17 @@ def _get_text_steps():
                 _3_2_split_meaning.split_sentences_by_meaning(),
             ),
         ),
+        (t("Prepare glossary terms"), _prepare_glossary_terms),
         (
             t("Summarization and multi-step translation"),
             lambda: (_4_1_summarize.get_summary(), _4_2_translate.translate_all()),
         ),
+    ]
+
+
+def _get_text_final_steps(final_text_step):
+    """Return final subtitle steps b.4-b.5 as (label, callable) list."""
+    return [
         (
             t("Cutting and aligning long subtitles"),
             lambda: (
@@ -142,15 +155,10 @@ def _get_text_steps():
             ),
         ),
         (
-            t("Merging subtitles into the video"),
-            _7_sub_into_vid.merge_subtitles_to_video,
-        ),
-        (
-            t("Finalize subtitle outputs"),
-            lambda: _touch(_TEXT_DONE_MARKER),
+            final_text_step,
+            lambda: (_7_sub_into_vid.merge_subtitles_to_video(), _touch(_TEXT_DONE_MARKER)),
         ),
     ]
-    return steps
 
 
 def _subtitle_length_controls():
@@ -223,55 +231,99 @@ def _subtitle_length_controls():
 
 def text_processing_section():
     st.header(t("b. Translate and Generate Subtitles"))
-    runner = TaskRunner.get(st.session_state, "_text_runner")
+    draft_runner = TaskRunner.get(st.session_state, "_text_draft_runner")
+    final_runner = TaskRunner.get(st.session_state, "_text_final_runner")
     from core._1_ytdlp import is_audio_only_input
     audio_only = is_audio_only_input()
 
+    final_text_step = t("Generate subtitle files") if audio_only else t("Merging subtitles into the video")
+    text_done = os.path.exists(_TEXT_DONE_MARKER) or (
+        os.path.exists("output/trans.srt")
+        and os.path.exists("output/src.srt")
+        and (audio_only or os.path.exists(SUB_VIDEO))
+    )
+    draft_done = os.path.exists(_4_2_TRANSLATION)
+
+    if text_done:
+        if draft_runner.is_done:
+            draft_runner.reset()
+        if final_runner.is_done:
+            final_runner.reset()
+        if not audio_only and load_key("burn_subtitles") and os.path.exists(SUB_VIDEO):
+            st.video(SUB_VIDEO)
+        download_subtitle_zip_button(text=t("Download All Srt Files"))
+
+        if st.button(t("Archive to 'history'"), key="cleanup_in_text_processing"):
+            cleanup()
+            st.rerun()
+        return True
+
+    _subtitle_length_controls()
+
     with st.container(border=True):
-        final_text_step = t("Generate subtitle files") if audio_only else t("Merging subtitles into the video")
+        st.subheader(t("b.1-3 Draft Translation"))
         st.markdown(
             f"""
         <p style='font-size: 20px;'>
-        {t("This stage includes the following steps:")}
-        <p style='font-size: 20px;'>
             1. {t("WhisperX word-level transcription")}<br>
             2. {t("Sentence segmentation using NLP and LLM")}<br>
-            3. {t("Summarization and multi-step translation")}<br>
+            2.5 {t("Prepare glossary terms")}<br>
+            3. {t("Summarization and multi-step translation")}
+        """,
+            unsafe_allow_html=True,
+        )
+
+        if draft_runner.is_active or draft_runner.is_done:
+            _task_control_panel("_text_draft_runner")
+        else:
+            if draft_done:
+                st.success(t("Draft translation complete. Review it before continuing."))
+                st.caption(t("Review file: `output/log/translation_results.xlsx`"))
+
+            if st.button(
+                t("Start Translation Draft"),
+                key="text_draft_processing_button",
+                disabled=final_runner.is_active,
+            ):
+                _clear_path(_TEXT_DONE_MARKER)
+                draft_runner.start(_get_text_draft_steps())
+                st.rerun()
+
+    with st.container(border=True):
+        st.subheader(t("b.4-5 Final Subtitles"))
+        st.markdown(
+            f"""
+        <p style='font-size: 20px;'>
             4. {t("Cutting and aligning long subtitles")}<br>
             5. {final_text_step}
         """,
             unsafe_allow_html=True,
         )
 
-        text_done = os.path.exists(_TEXT_DONE_MARKER) or (
-            os.path.exists("output/trans.srt")
-            and os.path.exists("output/src.srt")
-            and (audio_only or os.path.exists(SUB_VIDEO))
-        )
-
-        if not text_done:
-            if runner.is_active:
-                _task_control_panel("_text_runner")
-            elif runner.is_done:
-                _task_control_panel("_text_runner")
-            else:
-                _subtitle_length_controls()
-                if st.button(
-                    t("Start Processing Subtitles"), key="text_processing_button"
-                ):
-                    _clear_path(_TEXT_DONE_MARKER)
-                    steps = _get_text_steps()
-                    runner.start(steps)
-                    st.rerun()
+        if final_runner.is_active or final_runner.is_done:
+            _task_control_panel("_text_final_runner")
         else:
-            if not audio_only and load_key("burn_subtitles") and os.path.exists(SUB_VIDEO):
-                st.video(SUB_VIDEO)
-            download_subtitle_zip_button(text=t("Download All Srt Files"))
+            if draft_done:
+                st.caption(
+                    t(
+                        "This step uses the reviewed `output/log/translation_results.xlsx`."
+                    )
+                )
+            else:
+                st.warning(
+                    t(
+                        "Run step b.1-3 first, then review the draft translation before continuing."
+                    )
+                )
 
-            if st.button(t("Archive to 'history'"), key="cleanup_in_text_processing"):
-                cleanup()
+            if st.button(
+                t("Generate Final Subtitles"),
+                key="text_final_processing_button",
+                disabled=(not draft_done) or draft_runner.is_active,
+            ):
+                _clear_path(_TEXT_DONE_MARKER)
+                final_runner.start(_get_text_final_steps(final_text_step))
                 st.rerun()
-            return True
 
 
 # ─── Audio processing ───

@@ -7,7 +7,7 @@ from core._8_1_audio_task import check_len_then_trim
 from core._6_gen_sub import align_timestamp
 from core.utils import *
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from difflib import SequenceMatcher
 from core.utils.models import *
 console = Console()
@@ -54,12 +54,18 @@ def similar(a, b):
 @check_file_exists(_4_2_TRANSLATION)
 def translate_all():
     console.print("[bold green]Start Translating All...[/bold green]")
-    chunks = split_chunks_by_chars(chunk_size=600, max_i=10)
+    chunks = split_chunks_by_chars(chunk_size=200, max_i=3)
     with open(_4_1_TERMINOLOGY, 'r', encoding='utf-8') as file:
         theme_prompt = json.load(file).get('theme')
 
     # 🔄 Use concurrent execution for translation
-    with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        transient=True
+    ) as progress:
         task = progress.add_task("[cyan]Translating chunks...", total=len(chunks))
         with concurrent.futures.ThreadPoolExecutor(max_workers=load_key("max_workers")) as executor:
             futures = []

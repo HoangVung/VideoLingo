@@ -152,5 +152,7 @@
     "Media file detection failed: {error}": "Не удалось определить медиафайл: {error}",
     "Clear output and reselect": "Очистить output и выбрать заново",
     "Finalize subtitle outputs": "Финализировать вывод субтитров",
-    "Finalize dubbing outputs": "Финализировать вывод дубляжа"
+    "Finalize dubbing outputs": "Финализировать вывод дубляжа",
+    "Reflect Translate (2-step)": "Двухэтапный перевод (прямой + свободный)",
+    "Use two-step translation (direct + free) for more natural results, but costs double the API tokens.": "Используйте двухэтапный перевод (дословный + художественный) для получения более естественных результатов, но это потребует в два раза больше токенов API."
 }

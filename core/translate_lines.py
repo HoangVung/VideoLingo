@@ -6,13 +6,18 @@ from rich import box
 from core.utils import *
 console = Console()
 
-def valid_translate_result(result: dict, required_keys: list, required_sub_keys: list):
+def valid_translate_result(result, required_keys: list, required_sub_keys: list):
+    if not isinstance(result, dict):
+        return {"status": "error", "message": f"Response is not a dictionary, got {type(result).__name__}"}
+    
     # Check for the required key
     if not all(key in result for key in required_keys):
         return {"status": "error", "message": f"Missing required key(s): {', '.join(set(required_keys) - set(result.keys()))}"}
     
     # Check for required sub-keys in all items
     for key in result:
+        if not isinstance(result[key], dict):
+            return {"status": "error", "message": f"Item {key} is not a dictionary, got {type(result[key]).__name__}"}
         if not all(sub_key in result[key] for sub_key in required_sub_keys):
             return {"status": "error", "message": f"Missing required sub-key(s) in item {key}: {', '.join(set(required_sub_keys) - set(result[key].keys()))}"}
 
@@ -28,36 +33,57 @@ def translate_lines(lines, previous_content_prompt, after_cotent_prompt, things_
             return valid_translate_result(response_data, [str(i) for i in range(1, length+1)], ['direct'])
         def valid_express(response_data):
             return valid_translate_result(response_data, [str(i) for i in range(1, length+1)], ['free'])
+        last_result = None
         for retry in range(3):
-            if step_name == 'faithfulness':
-                result = ask_gpt(prompt+retry* " ", resp_type='json', valid_def=valid_faith, log_title=f'translate_{step_name}')
-            elif step_name == 'expressiveness':
-                result = ask_gpt(prompt+retry* " ", resp_type='json', valid_def=valid_express, log_title=f'translate_{step_name}')
-            if len(lines.split('\n')) == len(result):
-                return result
+            try:
+                if step_name == 'faithfulness':
+                    result = ask_gpt(prompt+retry* " ", resp_type='json', valid_def=valid_faith, log_title=f'translate_{step_name}')
+                elif step_name == 'expressiveness':
+                    result = ask_gpt(prompt+retry* " ", resp_type='json', valid_def=valid_express, log_title=f'translate_{step_name}')
+                last_result = result
+                if len(lines.split('\n')) == len(result):
+                    return result
+            except Exception:
+                pass
             if retry != 2:
                 console.print(f'[yellow]⚠️ {step_name.capitalize()} translation of block {index} failed, Retry...[/yellow]')
-        raise ValueError(f'[red]❌ {step_name.capitalize()} translation of block {index} failed after 3 retries. Please check `output/gpt_log/error.json` for more details.[/red]')
+        # Fallback: fill missing keys with empty translation instead of crashing
+        console.print(f'[yellow]⚠️ Block {index}: filling missing keys with empty strings as fallback[/yellow]')
+        line_list = lines.split('\n')
+        fallback = last_result if isinstance(last_result, dict) else {}
+        for i, line in enumerate(line_list, 1):
+            key = str(i)
+            if key not in fallback or not isinstance(fallback[key], dict):
+                if step_name == 'faithfulness':
+                    fallback[key] = {'origin': line, 'direct': line}
+                else:
+                    fallback[key] = {'free': fallback.get(key, {}).get('direct', line) if isinstance(fallback.get(key), dict) else line}
+        return fallback
 
     ## Step 1: Faithful to the Original Text
     prompt1 = get_prompt_faithfulness(lines, shared_prompt)
     faith_result = retry_translation(prompt1, len(lines.split('\n')), 'faithfulness')
 
-    for i in faith_result:
-        faith_result[i]["direct"] = faith_result[i]["direct"].replace('\n', ' ')
+    n_lines = len(lines.split('\n'))
+    ordered_keys = [str(i) for i in range(1, n_lines + 1)]
+    for k in ordered_keys:
+        if k in faith_result and isinstance(faith_result[k], dict):
+            faith_result[k]["direct"] = faith_result[k]["direct"].replace('\n', ' ')
 
     # If reflect_translate is False or not set, use faithful translation directly
     reflect_translate = load_key('reflect_translate')
     if not reflect_translate:
-        # If reflect_translate is False or not set, use faithful translation directly
-        translate_result = "\n".join([faith_result[i]["direct"].strip() for i in faith_result])
+        # Use explicit ordered keys to avoid extra/out-of-order keys from LLM
+        translate_result = "\n".join([faith_result[k]["direct"].strip() for k in ordered_keys if k in faith_result])
         
         table = Table(title="Translation Results", show_header=False, box=box.ROUNDED)
         table.add_column("Translations", style="bold")
-        for i, key in enumerate(faith_result):
-            table.add_row(f"[cyan]Origin:  {faith_result[key]['origin']}[/cyan]")
-            table.add_row(f"[magenta]Direct:  {faith_result[key]['direct']}[/magenta]")
-            if i < len(faith_result) - 1:
+        for idx, k in enumerate(ordered_keys):
+            if k not in faith_result:
+                continue
+            table.add_row(f"[cyan]Origin:  {faith_result[k].get('origin', '')}[/cyan]")
+            table.add_row(f"[magenta]Direct:  {faith_result[k]['direct']}[/magenta]")
+            if idx < n_lines - 1:
                 table.add_row("[yellow]" + "-" * 50 + "[/yellow]")
         
         console.print(table)
@@ -78,7 +104,8 @@ def translate_lines(lines, previous_content_prompt, after_cotent_prompt, things_
 
     console.print(table)
 
-    translate_result = "\n".join([express_result[i]["free"].replace('\n', ' ').strip() for i in express_result])
+    express_ordered = [str(i) for i in range(1, n_lines + 1)]
+    translate_result = "\n".join([express_result[k]["free"].replace('\n', ' ').strip() for k in express_ordered if k in express_result])
 
     if len(lines.split('\n')) != len(translate_result.split('\n')):
         console.print(Panel(f'[red]❌ Translation of block {index} failed, Length Mismatch, Please check `output/gpt_log/translate_expressiveness.json`[/red]'))
